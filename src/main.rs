@@ -77,6 +77,39 @@ fn find_records<'a>(tree: &'a Value, name: &str, out: &mut Vec<&'a Value>) {
     }
 }
 
+/// Like `find_records`, but stops descending when it encounters a record whose
+/// name appears in `boundaries`. Used to harvest e.g. `BATTLE_SETUP_UNIT`
+/// records that belong to one army without leaking units from a nested
+/// reinforcement army into the parent's results.
+fn find_records_until<'a>(
+    tree: &'a Value,
+    name: &str,
+    boundaries: &[&str],
+    out: &mut Vec<&'a Value>,
+) {
+    match tree {
+        Value::Object(map) => {
+            if let Some(rec) = map.get("Record") {
+                let rec_name = rec.get("name").and_then(Value::as_str);
+                if rec_name == Some(name) {
+                    out.push(rec);
+                    return;
+                }
+                if rec_name.is_some_and(|n| boundaries.contains(&n)) {
+                    return;
+                }
+            }
+            for (_, v) in map {
+                find_records_until(v, name, boundaries, out);
+            }
+        }
+        Value::Array(arr) => arr
+            .iter()
+            .for_each(|v| find_records_until(v, name, boundaries, out)),
+        _ => {}
+    }
+}
+
 fn flat_children(record: &Value) -> Vec<&Value> {
     let mut out = Vec::new();
     if let Some(groups) = record.get("children").and_then(Value::as_array) {
@@ -239,9 +272,16 @@ fn extract_alliance(index: usize, setup_alliance: &Value, result_alliance: Optio
 }
 
 fn extract_army(index: usize, setup_army: &Value, result_army: Option<&Value>) -> Value {
+    // Scope the unit search to this army's own subtree. Reinforcement armies
+    // are nested inside their parent BATTLE_SETUP_ARMY in the ESF tree, so a
+    // naive recursive walk would attribute the reinforcement's units to the
+    // main army as well, double-counting. Stopping at nested BATTLE_SETUP_ARMY
+    // records keeps each army's unit list to its own troops.
     let setup_units = {
         let mut out = Vec::new();
-        find_records(setup_army, "BATTLE_SETUP_UNIT", &mut out);
+        for child in flat_children(setup_army) {
+            find_records_until(child, "BATTLE_SETUP_UNIT", &["BATTLE_SETUP_ARMY"], &mut out);
+        }
         out
     };
     let units = setup_units
