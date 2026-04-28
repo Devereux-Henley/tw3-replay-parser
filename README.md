@@ -1,0 +1,76 @@
+# tw-replay-parser
+
+A small Rust CLI that decodes a Total War: Warhammer 3 replay file (ESF format)
+and emits a normalised JSON summary of the battle to stdout.
+
+The output is intended for ingestion by downstream services — match listings,
+army viewers, statistics — that should not have to understand the raw ESF tree.
+
+## Build
+
+```sh
+cargo build --release
+```
+
+Requires Rust 1.94 or newer (2024 edition).
+
+## Usage
+
+```sh
+tw-replay-parser <path-to-replay.replay>
+```
+
+On success, a JSON document is printed to stdout. On failure, a JSON object of
+the form `{"error": "..."}` is printed to stderr.
+
+### Exit codes
+
+| Code | Meaning                              |
+| ---- | ------------------------------------ |
+| `0`  | Success                              |
+| `1`  | Decode, extraction, or I/O failure   |
+| `2`  | Missing required argument            |
+
+## Output schema
+
+The top-level document is versioned via `schema_version`. Consumers should
+treat unknown fields as forward-compatible additions and pin to a specific
+`schema_version` when shape changes matter.
+
+```jsonc
+{
+  "schema_version": 1,
+  "format": "<ESF signature>",
+  "creation_date_unix": 0,
+  "match_id": "<utf16 session id, or null>",
+  "played_at": { "year": 0, "month": 0, "day": 0, "hour": 0, "minute": 0, "second": 0 },
+  "victory_condition": "<ascii key, or null>",
+  "uploader_local_alliance_index": 0,
+  "alliances": [
+    {
+      "index": 0,
+      "faction_key": "wh_...",
+      "model_count": 0,
+      "armies": [
+        {
+          "index": 0,
+          "is_reinforcement": false,
+          "commander_display": "",
+          "commander_portrait": "",
+          "faction_flag": "",
+          "force_value": 0,
+          "units": [{ "key": "wh_..." }]
+        }
+      ]
+    }
+  ]
+}
+```
+
+`uploader_local_alliance_index` is the alliance the player who saved the
+replay was on. It lets a server map the uploader's identity to one specific
+alliance when recording results.
+
+## License
+
+AGPL-3.0-or-later. See [LICENSE](LICENSE).
