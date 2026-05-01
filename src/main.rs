@@ -147,9 +147,10 @@ fn as_bool(node: &Value) -> Option<bool> {
 }
 
 fn as_u8(node: &Value) -> Option<u64> {
-    node.get("U8")
-        .and_then(|v| v.get("value"))
-        .and_then(Value::as_u64)
+    // Unlike U32 and Bool, ESF U8 leaves serialise as a flat number under
+    // the "U8" key (`{"U8": 9}`) rather than the optimised `{"value": …}`
+    // wrapper. Handle both forms so this stays robust if rpfm_lib changes.
+    node.get("U8").and_then(|v| v.as_u64().or_else(|| v.get("value").and_then(Value::as_u64)))
 }
 
 // ----- domain extraction ----------------------------------------------------
@@ -295,14 +296,15 @@ fn extract_army(index: usize, setup_army: &Value, result_army: Option<&Value>) -
         .map(|u| {
             let kids = flat_children(u);
             let key = kids.get(3).and_then(|n| as_ascii(n)).unwrap_or("").to_string();
-            // Veteran rank (0-9). The 9 consecutive U8 children at indices 23-31
-            // are zero in every unleveled sample we've inspected; the first one
-            // is the most likely candidate for the rank slot. See
-            // examples/dump_setup_unit.rs for how to re-verify against a replay
-            // where one player has a known leveled unit. Clamped to [0, 9] so
-            // a stray byte can't push the consumer off the end of the
-            // unit_level_cost table.
-            let level = kids.get(23).and_then(|n| as_u8(n)).unwrap_or(0).min(9);
+            // Veteran rank (0-9). Confirmed empirically against an Auto-save
+            // replay containing a level-9 Aspiring Champions, a level-1 Chosen
+            // DW, and a level-3 Chosen DW — child[15] held 9, 1, 3 in the
+            // expected positions while child[48] (cost) showed the engine
+            // formula round(base * cost_multiplier) + fixed_cost applied. See
+            // examples/dump_setup_unit.rs for how to re-verify after a game
+            // patch. Clamped to [0, 9] so a stray byte can't push the
+            // consumer off the end of the unit_level_cost table.
+            let level = kids.get(15).and_then(|n| as_u8(n)).unwrap_or(0).min(9);
             json!({ "key": key, "level": level })
         })
         .collect::<Vec<_>>();
