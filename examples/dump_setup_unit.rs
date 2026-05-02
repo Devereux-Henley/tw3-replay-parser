@@ -160,24 +160,3 @@ fn flat_children(record: &Value) -> Vec<&Value> {
     out
 }
 
-/// One-line summary of an ESF leaf — enough to spot integer ranks.
-fn short_repr(v: &Value) -> String {
-    if let Some(o) = v.as_object() {
-        for (k, inner) in o {
-            // Most ESF leaves are { "<TypeName>": { "value": ... } } or
-            // { "<TypeName>": "<scalar>" }.
-            let rendered = inner
-                .get("value")
-                .map(|x| x.to_string())
-                .unwrap_or_else(|| inner.to_string());
-            // Truncate ridiculously long arrays.
-            let trimmed = if rendered.len() > 80 {
-                format!("{}…", &rendered[..80])
-            } else {
-                rendered
-            };
-            return format!("{k}({trimmed})");
-        }
-    }
-    "<non-object>".to_string()
-}
