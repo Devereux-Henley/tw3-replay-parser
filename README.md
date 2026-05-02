@@ -59,7 +59,7 @@ treat unknown fields as forward-compatible additions and pin to a specific
           "commander_portrait": "",
           "faction_flag": "",
           "force_value": 0,
-          "units": [{ "key": "wh_..." }]
+          "units": [{ "key": "wh_...", "level": 0 }]
         }
       ]
     }
@@ -70,6 +70,13 @@ treat unknown fields as forward-compatible additions and pin to a specific
 `uploader_local_alliance_index` is the alliance the player who saved the
 replay was on. It lets a server map the uploader's identity to one specific
 alliance when recording results.
+
+Each unit's `level` is the veteran rank (0-9) the unit was bought at in
+the custom-battle UI. The `unit_stats_land_experience_bonuses_tables` row
+matching that level controls the cost adjustment via the engine formula
+`adjusted_cost = round(base_cost * cost_multiplier) + fixed_cost`. Older
+replays that predate this field still parse — consumers should treat a
+missing `level` as 0.
 
 ## License
 
