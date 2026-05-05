@@ -1,0 +1,63 @@
+FROM registry.fedoraproject.org/fedora-toolbox:41
+
+LABEL com.github.containers.toolbox="true" \
+      summary="Rust dev environment for tw3-replay-parser"
+
+RUN dnf -y install \
+      emacs \
+      git \
+      gh \
+      make \
+      gcc \
+      pkgconf-pkg-config \
+      openssl-devel \
+      ripgrep \
+      which \
+      unzip \
+    && dnf clean all
+
+ARG RUST_VERSION=1.94.0
+RUN curl -fsSL --proto '=https' --tlsv1.2 -o /tmp/rustup-init.sh \
+      https://sh.rustup.rs \
+    && chmod +x /tmp/rustup-init.sh \
+    && CARGO_HOME=/usr/local/cargo RUSTUP_HOME=/usr/local/rustup \
+       /tmp/rustup-init.sh -y --no-modify-path \
+         --default-toolchain ${RUST_VERSION} \
+         --component rustfmt --component clippy --component rust-analyzer \
+    && rm /tmp/rustup-init.sh \
+    && chmod -R a+rwX /usr/local/cargo /usr/local/rustup
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN cat >/etc/profile.d/00-local-bin-path.sh <<'EOF'
+case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+EOF
+
+RUN cat >/etc/profile.d/01-cargo-path.sh <<'EOF'
+export RUSTUP_HOME=/usr/local/rustup
+export CARGO_HOME=/usr/local/cargo
+case ":$PATH:" in
+    *":/usr/local/cargo/bin:"*) ;;
+    *) export PATH="/usr/local/cargo/bin:$PATH" ;;
+esac
+EOF
+
+RUN cat >/etc/profile.d/emacs-daemon.sh <<'EOF'
+if [ -f /run/.toolboxenv ] && [ -t 1 ]; then
+    if ! emacsclient --eval t >/dev/null 2>&1; then
+        (emacs --daemon >/dev/null 2>&1 &)
+    fi
+fi
+EOF
+
+RUN cat >/etc/profile.d/claude-install.sh <<'EOF'
+if [ -f /run/.toolboxenv ] && [ -t 1 ] && ! command -v claude >/dev/null 2>&1; then
+    echo "Installing Claude Code (first run)..."
+    curl -fsSL https://claude.ai/install.sh | bash
+fi
+EOF
