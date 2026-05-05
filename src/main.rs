@@ -305,7 +305,14 @@ fn extract_army(index: usize, setup_army: &Value, result_army: Option<&Value>) -
             // patch. Clamped to [0, 9] so a stray byte can't push the
             // consumer off the end of the unit_level_cost table.
             let level = kids.get(15).and_then(|n| as_u8(n)).unwrap_or(0).min(9);
-            json!({ "key": key, "level": level })
+            // Engine-resolved final cost: post-mount, post-mark, post-veterancy,
+            // post-armory. This is the number shown in the drafting UI's cost
+            // pip and the right value to sum for a player's gold-spend total.
+            // Consumers should prefer this over reconstructing from base +
+            // adders, since variant-key resolution is lossy for mount/mark
+            // combinations.
+            let cost = kids.get(48).and_then(|n| as_u32(n)).unwrap_or(0);
+            json!({ "key": key, "level": level, "cost": cost })
         })
         .collect::<Vec<_>>();
 

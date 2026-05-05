@@ -59,7 +59,7 @@ treat unknown fields as forward-compatible additions and pin to a specific
           "commander_portrait": "",
           "faction_flag": "",
           "force_value": 0,
-          "units": [{ "key": "wh_...", "level": 0 }]
+          "units": [{ "key": "wh_...", "level": 0, "cost": 0 }]
         }
       ]
     }
@@ -77,6 +77,20 @@ matching that level controls the cost adjustment via the engine formula
 `adjusted_cost = round(base_cost * cost_multiplier) + fixed_cost`. Older
 replays that predate this field still parse — consumers should treat a
 missing `level` as 0.
+
+`cost` is the engine-resolved final cost for the unit slot — base cost
+adjusted for mount, mark, lore, veterancy, and any armory upgrades. This
+is the value the drafting UI shows in the unit's cost pip and the number
+to sum if you want a player's gold-spend total. Consumers should prefer
+this over reconstructing cost from base + adder tables, since variant-key
+resolution against display-name seeds is lossy for mount/mark/lore
+combinations. Older parser binaries do not emit this field; consumers
+should treat a missing `cost` as a signal to fall back to base-cost
+lookup.
+
+`force_value` (on the army record) is **not** the sum of unit costs —
+empirically it sits well below the gold total and is likely a relative
+strength or scoring index. Don't use it as a cost reference.
 
 ## License
 
