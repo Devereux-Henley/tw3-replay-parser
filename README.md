@@ -39,7 +39,7 @@ treat unknown fields as forward-compatible additions and pin to a specific
 
 ```jsonc
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "format": "<ESF signature>",
   "creation_date_unix": 0,
   "match_id": "<utf16 session id, or null>",
@@ -59,7 +59,7 @@ treat unknown fields as forward-compatible additions and pin to a specific
           "commander_portrait": "",
           "faction_flag": "",
           "force_value": 0,
-          "units": [{ "key": "wh_...", "level": 0, "cost": 0 }]
+          "units": [{ "key": "wh_...", "level": 0, "cost": 0, "spells": ["wh_..._spell_..."] }]
         }
       ]
     }
@@ -91,6 +91,13 @@ lookup.
 `force_value` (on the army record) is **not** the sum of unit costs —
 empirically it sits well below the gold total and is likely a relative
 strength or scoring index. Don't use it as a cost reference.
+
+`spells` is the deduped list of every spell key the unit can cast — the
+engine emits one `BATTLE_SETUP_SPECIAL_ABILITY` record per spell under
+`UNIT_CAPABILITIES > UNIT_ABILITIES`, and we collect every Ascii leaf
+whose value contains `_spell_`. Non-casters get an empty array. Upgraded
+spell variants (`..._upgraded`) are kept as distinct keys because the
+seed table treats them as separate spells.
 
 ## License
 
