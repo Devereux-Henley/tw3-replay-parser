@@ -217,7 +217,7 @@ fn extract(tree: &Value) -> Result<Value, String> {
         .collect::<Vec<_>>();
 
     Ok(json!({
-        "schema_version": 1,
+        "schema_version": 2,
         "format": signature,
         "creation_date_unix": creation_date,
         "match_id": match_id,
@@ -312,7 +312,8 @@ fn extract_army(index: usize, setup_army: &Value, result_army: Option<&Value>) -
             // adders, since variant-key resolution is lossy for mount/mark
             // combinations.
             let cost = kids.get(48).and_then(|n| as_u32(n)).unwrap_or(0);
-            json!({ "key": key, "level": level, "cost": cost })
+            let spells = extract_unit_spells(u);
+            json!({ "key": key, "level": level, "cost": cost, "spells": spells })
         })
         .collect::<Vec<_>>();
 
@@ -338,4 +339,38 @@ fn extract_army(index: usize, setup_army: &Value, result_army: Option<&Value>) -
         "force_value": force_value,
         "units": units,
     })
+}
+
+/// Distinct spell keys equipped on a BATTLE_SETUP_UNIT.  The engine lists
+/// every spell the caster knows as a BATTLE_SETUP_SPECIAL_ABILITY record
+/// under UNIT_CAPABILITIES > UNIT_ABILITIES; the canonical key shows up as
+/// one of the Ascii leaves on each record (positions vary by ability type,
+/// but the same key appears across all of them). We collect every Ascii
+/// leaf whose value contains `_spell_` and dedupe so a single spell that
+/// surfaces in multiple slots isn't emitted twice. The upgraded variant of
+/// a spell (`..._upgraded`) is a separate engine entity with its own
+/// `spell` row, so we keep it as a distinct key rather than folding it
+/// into the base spell.
+fn extract_unit_spells(setup_unit: &Value) -> Vec<String> {
+    let Some(capabilities) = find_record(setup_unit, "UNIT_CAPABILITIES") else {
+        return Vec::new();
+    };
+    let Some(abilities) = find_record(capabilities, "UNIT_ABILITIES") else {
+        return Vec::new();
+    };
+    let mut ability_records = Vec::new();
+    find_records(abilities, "BATTLE_SETUP_SPECIAL_ABILITY", &mut ability_records);
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::new();
+    for record in ability_records {
+        for child in flat_children(record) {
+            if let Some(s) = as_ascii(child)
+                && s.contains("_spell_")
+                && seen.insert(s.to_string())
+            {
+                out.push(s.to_string());
+            }
+        }
+    }
+    out
 }
